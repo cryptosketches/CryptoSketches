@@ -103,7 +103,7 @@ contract SketchMarket is Ownable {
 
     // Trading parameters
     ownerCut = 300; // 3% cut to auctioneer
-    listingFeeInWei = 0; // free at launch, adjustable dependent on hosting fees!
+    listingFeeInWei = 1000000000000000; // 0.001 ETH, to discourage spam
   }
 
   function withdrawBalance() external onlyOwner {
@@ -145,7 +145,7 @@ contract SketchMarket is Ownable {
     sketchIndexToOwnerFlag[index] = _ownerFlag;
   }
 
-  function getSketch(uint256 index) external view returns (string _name, string _data, address _holder, address _author, address _ownerFlag) {
+  function getSketch(uint256 index) external view returns (string _name, string _data, address _holder, address _author, uint8 _ownerFlag, uint256 _highestBidValue, uint256 _offerMinValue) {
     require(totalSupply != 0);
     require(index < totalSupply);
 
@@ -154,13 +154,96 @@ contract SketchMarket is Ownable {
     _holder = sketchIndexToHolder[index];
     _author = sketchIndexToAuthor[index];
     _ownerFlag = sketchIndexToOwnerFlag[index];
+    _highestBidValue = sketchIndexToHighestBid[index].value;
+    _offerMinValue = sketchIndexToOffer[index].minValue;
+  }
+
+  function getBidCountForSketchesWithHolder(address _holder) external view returns (uint256) {
+    uint256 count = balanceOf[_holder];
+
+    if (count == 0) {
+      return 0;
+    } else {
+      uint256 result = 0;
+      uint256 totalCount = totalSupply;
+      uint256 sketchIndex;
+
+      for (sketchIndex = 0; sketchIndex <= totalCount; sketchIndex++) {
+        if ((sketchIndexToHolder[sketchIndex] == _holder) && sketchIndexToHighestBid[sketchIndex].hasBid) {
+          result++;
+        }
+      }
+      return result;
+    }
+  }
+
+  function getSketchesOnOffer() external view returns (uint256[]) {
+    if (totalSupply == 0) {
+      return new uint256[](0);
+    }
+
+    uint256 count = 0;
+    uint256 totalCount = totalSupply;
+    uint256 sketchIndex;
+
+    for (sketchIndex = 0; sketchIndex <= totalCount; sketchIndex++) {
+      if (sketchIndexToOffer[sketchIndex].isForSale) {
+        count++;
+      }
+    }
+
+    if (count == 0) {
+      return new uint256[](0);
+    }
+
+    uint256[] memory result = new uint256[](count);
+    uint256 resultIndex = 0;
+
+    for (sketchIndex = 0; sketchIndex <= totalCount; sketchIndex++) {
+      if (sketchIndexToOffer[sketchIndex].isForSale) {
+        result[resultIndex] = sketchIndex;
+        resultIndex++;
+      }
+    }
+    return result;
+  }
+
+  function getSketchesOnOfferWithHolder(address _holder) external view returns (uint256[]) {
+    if (totalSupply == 0) {
+      return new uint256[](0);
+    }
+
+    uint256 count = 0;
+    uint256 totalCount = totalSupply;
+    uint256 sketchIndex;
+
+    for (sketchIndex = 0; sketchIndex <= totalCount; sketchIndex++) {
+      if (sketchIndexToOffer[sketchIndex].isForSale && (sketchIndexToHolder[sketchIndex] == _holder)) {
+        count++;
+      }
+    }
+
+    if (count == 0) {
+      return new uint256[](0);
+    }
+
+    uint256[] memory result = new uint256[](count);
+    uint256 resultIndex = 0;
+
+    for (sketchIndex = 0; sketchIndex <= totalCount; sketchIndex++) {
+      if (sketchIndexToOffer[sketchIndex].isForSale && (sketchIndexToHolder[sketchIndex] == _holder)) {
+        result[resultIndex] = sketchIndex;
+        resultIndex++;
+      }
+    }
+    return result;
   }
 
   function getSketchesWithHolder(address _holder) external view returns (uint256[]) {
     uint256 count = balanceOf[_holder];
 
     if (count == 0) {
-      return new uint256[](0);      
+      return new uint256[](0);
     } else {
       uint256[] memory result = new uint256[](count);
       uint256 totalCount = totalSupply;
@@ -243,12 +326,12 @@ contract SketchMarket is Ownable {
   }
 
   // Place a Sketch up for sale, but only to a specific buyer
-  function offerSketchForSaleToAddress(uint sketchIndex, uint minSalePriceInWei, address toAddress) public onlyHolderOf(sketchIndex) {
-    require(toAddress != address(0));
-    require(toAddress != msg.sender);
+  function offerSketchForSaleToAddress(uint _sketchIndex, uint _minSalePriceInWei, address _toAddress) public onlyHolderOf(_sketchIndex) {
+    require(_toAddress != address(0));
+    require(_toAddress != msg.sender);
 
-    sketchIndexToOffer[sketchIndex] = Offer(true, sketchIndex, msg.sender, minSalePriceInWei, toAddress);
-    SketchOffered(sketchIndex, minSalePriceInWei, toAddress);
+    sketchIndexToOffer[_sketchIndex] = Offer(true, _sketchIndex, msg.sender, _minSalePriceInWei, _toAddress);
+    SketchOffered(_sketchIndex, _minSalePriceInWei, _toAddress);
   }
 
   // Accept a bid for a Sketch that you own, receiving the amount for withdrawal at any time - note minPrice safeguard!
