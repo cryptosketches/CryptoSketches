@@ -53,7 +53,7 @@ contract SketchMarket is Ownable {
 
   mapping(address => uint256) public sketchAuthorCount;
 
-  event SketchCreated(address author, uint256 sketchIndex);
+  event SketchCreated(address indexed author, uint256 indexed sketchIndex);
   // }
 
   // Sketch trading {
@@ -68,8 +68,8 @@ contract SketchMarket is Ownable {
   mapping (uint256 => Offer) public sketchIndexToOffer;
   mapping (uint256 => Bid) public sketchIndexToHighestBid;
   mapping (address => uint256) public accountToWithdrawableValue;
-  
-  event SketchTransfer(address indexed from, address indexed to, uint256 sketchIndex);
+
+  event SketchTransfer(uint256 indexed sketchIndex, address indexed fromAddress, address indexed toAddress);
   event SketchOffered(uint indexed sketchIndex, uint minValue, address indexed toAddress);
   event SketchBidEntered(uint indexed sketchIndex, uint value, address indexed fromAddress);
   event SketchBidWithdrawn(uint indexed sketchIndex, uint value, address indexed fromAddress);
@@ -106,10 +106,6 @@ contract SketchMarket is Ownable {
     listingFeeInWei = 1000000000000000; // 0.001 ETH, to discourage spam
   }
 
-  function withdrawBalance() external onlyOwner {
-    msg.sender.transfer(this.balance);
-  }
-
   function setOwnerCut(uint256 _ownerCut) external onlyOwner {
     ownerCut = _ownerCut;
   }
@@ -121,7 +117,7 @@ contract SketchMarket is Ownable {
   // -- Creation and fetching methods
 
   function createSketch(string _name, string _data) external payable {
-    require(msg.value >= listingFeeInWei);
+    require(msg.value == listingFeeInWei);
     require(bytes(_name).length < 256);     // limit name byte size to 255
     require(bytes(_data).length < 1048576); // limit drawing byte size to 1,048,576
 
@@ -303,7 +299,7 @@ contract SketchMarket is Ownable {
     balanceOf[to]++;
 
     Transfer(msg.sender, to, 1); // ERC-20
-    SketchTransfer(msg.sender, to, sketchIndex);
+    SketchTransfer(sketchIndex, msg.sender, to);
 
     // If the recipient had bid for the Sketch, remove the bid and make it possible to refund its value
     Bid storage bid = sketchIndexToHighestBid[sketchIndex];
@@ -336,19 +332,20 @@ contract SketchMarket is Ownable {
 
   // Accept a bid for a Sketch that you own, receiving the amount for withdrawal at any time - note minPrice safeguard!
   function acceptBidForSketch(uint sketchIndex, uint minPrice) public onlyHolderOf(sketchIndex) {
-    address seller = msg.sender;
+    address seller = msg.sender;    
     Bid storage bid = sketchIndexToHighestBid[sketchIndex];
     uint price = bid.value;
+    address bidder = bid.bidder;
 
     require(price > 0);
     require(price >= minPrice); // safeguard: accept the bid you think you're accepting!
 
-    sketchIndexToHolder[sketchIndex] = bid.bidder; // transfer actual holdership!
+    sketchIndexToHolder[sketchIndex] = bidder; // transfer actual holdership!
     balanceOf[seller]--; // update balances
-    balanceOf[bid.bidder]++;
-    Transfer(seller, bid.bidder, 1);
+    balanceOf[bidder]++;
+    Transfer(seller, bidder, 1);
 
-    sketchIndexToOffer[sketchIndex] = Offer(false, sketchIndex, bid.bidder, 0, 0x0); // remove the offer    
+    sketchIndexToOffer[sketchIndex] = Offer(false, sketchIndex, bidder, 0, 0x0); // remove the offer    
     sketchIndexToHighestBid[sketchIndex] = Bid(false, sketchIndex, 0x0, 0); // remove the bid
 
     uint256 ownerProceeds = computeCut(price);
@@ -357,7 +354,7 @@ contract SketchMarket is Ownable {
     accountToWithdrawableValue[seller] += holderProceeds; // make profit available to seller for withdrawal
     accountToWithdrawableValue[owner] += ownerProceeds;   // make cut available to auctioneer for withdrawal
 
-    SketchBought(sketchIndex, price, seller, bid.bidder); // note that SketchNoLongerForSale event will not be fired
+    SketchBought(sketchIndex, price, seller, bidder); // note that SketchNoLongerForSale event will not be fired
   }
 
   // Buy a Sketch that's up for sale now, provided you've matched the Offer price and it's not on offer to a specific buyer
