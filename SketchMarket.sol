@@ -1,4 +1,4 @@
-pragma solidity ^0.4.18;
+pragma solidity 0.4.18;
 
 /*
 
@@ -107,10 +107,13 @@ contract SketchMarket is Ownable {
   }
 
   function setOwnerCut(uint256 _ownerCut) external onlyOwner {
+    require(_ownerCut == uint256(uint16(_ownerCut)));
+    require(_ownerCut < 10000);
     ownerCut = _ownerCut;
   }
 
   function setListingFeeInWei(uint256 _listingFeeInWei) external onlyOwner {
+    require(_listingFeeInWei == uint256(uint128(_listingFeeInWei))); // length check
     listingFeeInWei = _listingFeeInWei;
   }
 
@@ -338,7 +341,9 @@ contract SketchMarket is Ownable {
     address bidder = bid.bidder;
 
     require(price > 0);
-    require(price >= minPrice); // safeguard: accept the bid you think you're accepting!
+    require(price == uint256(uint128(price))); // length check for computeCut(...)
+    require(minPrice == uint256(uint128(minPrice))); // length check for computeCut(...)
+    require(price >= minPrice); // you may be accepting a different bid than you think, but its value will be at least as high
 
     sketchIndexToHolder[sketchIndex] = bidder; // transfer actual holdership!
     balanceOf[seller]--; // update balances
@@ -401,8 +406,7 @@ contract SketchMarket is Ownable {
   // (b) a seller owed funds from the sale of a Sketch
   function withdraw() external {
       uint amount = accountToWithdrawableValue[msg.sender];
-      // Remember to zero the pending refund before
-      // sending to prevent re-entrancy attacks
+      // Zero the pending refund before transferring to prevent re-entrancy attacks
       accountToWithdrawableValue[msg.sender] = 0;
       msg.sender.transfer(amount);
   }
