@@ -70,11 +70,11 @@ contract SketchMarket is Ownable {
   mapping (address => uint256) public accountToWithdrawableValue;
 
   event SketchTransfer(uint256 indexed sketchIndex, address indexed fromAddress, address indexed toAddress);
-  event SketchOffered(uint indexed sketchIndex, uint minValue, address indexed toAddress);
-  event SketchBidEntered(uint indexed sketchIndex, uint value, address indexed fromAddress);
-  event SketchBidWithdrawn(uint indexed sketchIndex, uint value, address indexed fromAddress);
-  event SketchBought(uint indexed sketchIndex, uint value, address indexed fromAddress, address indexed toAddress);
-  event SketchNoLongerForSale(uint indexed sketchIndex);
+  event SketchOffered(uint256 indexed sketchIndex, uint256 minValue, address indexed toAddress);
+  event SketchBidEntered(uint256 indexed sketchIndex, uint256 value, address indexed fromAddress);
+  event SketchBidWithdrawn(uint256 indexed sketchIndex, uint256 value, address indexed fromAddress);
+  event SketchBought(uint256 indexed sketchIndex, uint256 value, address indexed fromAddress, address indexed toAddress);
+  event SketchNoLongerForSale(uint256 indexed sketchIndex);
 
   struct Offer {
     bool isForSale;
@@ -108,7 +108,7 @@ contract SketchMarket is Ownable {
 
   function setOwnerCut(uint256 _ownerCut) external onlyOwner {
     require(_ownerCut == uint256(uint16(_ownerCut)));
-    require(_ownerCut < 10000);
+    require(_ownerCut <= 10000);
     ownerCut = _ownerCut;
   }
 
@@ -282,7 +282,7 @@ contract SketchMarket is Ownable {
 
   // -- Trading methods
 
-  modifier onlyHolderOf(uint sketchIndex) {
+  modifier onlyHolderOf(uint256 sketchIndex) {
     require(totalSupply != 0);
     require(sketchIndex < totalSupply);
     require(sketchIndexToHolder[sketchIndex] == msg.sender);
@@ -290,7 +290,7 @@ contract SketchMarket is Ownable {
  }
 
   // Transfer holdership without requiring payment
-  function transferSketch(address to, uint sketchIndex) external onlyHolderOf(sketchIndex) {
+  function transferSketch(address to, uint256 sketchIndex) external onlyHolderOf(sketchIndex) {
     require(to != address(0));
 
     if (sketchIndexToOffer[sketchIndex].isForSale) {
@@ -313,19 +313,19 @@ contract SketchMarket is Ownable {
   }
 
   // Withdraw Sketch from sale (NOTE: does not cancel bids, since bids must be withdrawn manually by bidders)
-  function sketchNoLongerForSale(uint _sketchIndex) public onlyHolderOf(_sketchIndex) {
+  function sketchNoLongerForSale(uint256 _sketchIndex) public onlyHolderOf(_sketchIndex) {
     sketchIndexToOffer[_sketchIndex] = Offer(false, _sketchIndex, msg.sender, 0, 0x0);
     SketchNoLongerForSale(_sketchIndex);
   }
 
   // Place a Sketch up for sale, to any buyer
-  function offerSketchForSale(uint _sketchIndex, uint _minSalePriceInWei) public onlyHolderOf(_sketchIndex) {
+  function offerSketchForSale(uint256 _sketchIndex, uint256 _minSalePriceInWei) public onlyHolderOf(_sketchIndex) {
     sketchIndexToOffer[_sketchIndex] = Offer(true, _sketchIndex, msg.sender, _minSalePriceInWei, 0x0);
     SketchOffered(_sketchIndex, _minSalePriceInWei, 0x0);
   }
 
   // Place a Sketch up for sale, but only to a specific buyer
-  function offerSketchForSaleToAddress(uint _sketchIndex, uint _minSalePriceInWei, address _toAddress) public onlyHolderOf(_sketchIndex) {
+  function offerSketchForSaleToAddress(uint256 _sketchIndex, uint256 _minSalePriceInWei, address _toAddress) public onlyHolderOf(_sketchIndex) {
     require(_toAddress != address(0));
     require(_toAddress != msg.sender);
 
@@ -334,10 +334,10 @@ contract SketchMarket is Ownable {
   }
 
   // Accept a bid for a Sketch that you own, receiving the amount for withdrawal at any time - note minPrice safeguard!
-  function acceptBidForSketch(uint sketchIndex, uint minPrice) public onlyHolderOf(sketchIndex) {
+  function acceptBidForSketch(uint256 sketchIndex, uint256 minPrice) public onlyHolderOf(sketchIndex) {
     address seller = msg.sender;    
     Bid storage bid = sketchIndexToHighestBid[sketchIndex];
-    uint price = bid.value;
+    uint256 price = bid.value;
     address bidder = bid.bidder;
 
     require(price > 0);
@@ -363,7 +363,7 @@ contract SketchMarket is Ownable {
   }
 
   // Buy a Sketch that's up for sale now, provided you've matched the Offer price and it's not on offer to a specific buyer
-  function buySketch(uint sketchIndex) external payable {      
+  function buySketch(uint256 sketchIndex) external payable {      
     Offer storage offer = sketchIndexToOffer[sketchIndex];
     uint256 messageValue = msg.value;
 
@@ -405,20 +405,20 @@ contract SketchMarket is Ownable {
   // (a) a buyer that withdraws their bid or invalidates it by purchasing a Sketch outright for its asking price
   // (b) a seller owed funds from the sale of a Sketch
   function withdraw() external {
-      uint amount = accountToWithdrawableValue[msg.sender];
+      uint256 amount = accountToWithdrawableValue[msg.sender];
       // Zero the pending refund before transferring to prevent re-entrancy attacks
       accountToWithdrawableValue[msg.sender] = 0;
       msg.sender.transfer(amount);
   }
 
   // Enter a bid, regardless of whether the Sketch holder wishes to sell or not
-  function enterBidForSketch(uint sketchIndex) external payable {
+  function enterBidForSketch(uint256 sketchIndex) external payable {
       require(totalSupply != 0);
       require(sketchIndex < totalSupply);
       require(sketchIndexToHolder[sketchIndex] != 0x0); // can't bid on "non-owned" Sketch (theoretically impossible anyway)
       require(sketchIndexToHolder[sketchIndex] != msg.sender); // can't bid on a Sketch that you own
 
-      uint price = msg.value; // in wei
+      uint256 price = msg.value; // in wei
 
       require(price > 0); // can't bid zero
       require(price == uint256(uint128(price))); // length check for computeCut(...)      
@@ -436,7 +436,7 @@ contract SketchMarket is Ownable {
       SketchBidEntered(sketchIndex, price, msg.sender);
   }
 
-  function withdrawBidForSketch(uint sketchIndex) public {
+  function withdrawBidForSketch(uint256 sketchIndex) public {
     require(totalSupply != 0);
     require(sketchIndex < totalSupply);
     require(sketchIndexToHolder[sketchIndex] != 0x0); // can't bid on "non-owned" Sketch (theoretically impossible anyway)
@@ -447,7 +447,7 @@ contract SketchMarket is Ownable {
 
     SketchBidWithdrawn(sketchIndex, bid.value, msg.sender);
 
-    uint amount = bid.value;
+    uint256 amount = bid.value;
     sketchIndexToHighestBid[sketchIndex] = Bid(false, sketchIndex, 0x0, 0);
 
     // Refund the bid money directly
