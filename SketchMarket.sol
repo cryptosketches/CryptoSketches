@@ -102,8 +102,8 @@ contract SketchMarket is Ownable {
     decimals = 0; // whole number; number of sketches owned
 
     // Trading parameters
-    ownerCut = 300; // 3% cut to auctioneer
-    listingFeeInWei = 1000000000000000; // 0.001 ETH, to discourage spam
+    ownerCut = 375; // 3.75% cut to auctioneer
+    listingFeeInWei = 5000000000000000; // 0.005 ETH, to discourage spam
   }
 
   function setOwnerCut(uint256 _ownerCut) external onlyOwner {
@@ -292,6 +292,7 @@ contract SketchMarket is Ownable {
   // Transfer holdership without requiring payment
   function transferSketch(address to, uint256 sketchIndex) external onlyHolderOf(sketchIndex) {
     require(to != address(0));
+    require(balanceOf[msg.sender] > 0);
 
     if (sketchIndexToOffer[sketchIndex].isForSale) {
       sketchNoLongerForSale(sketchIndex); // remove the offer
@@ -336,6 +337,8 @@ contract SketchMarket is Ownable {
   // Accept a bid for a Sketch that you own, receiving the amount for withdrawal at any time - note minPrice safeguard!
   function acceptBidForSketch(uint256 sketchIndex, uint256 minPrice) public onlyHolderOf(sketchIndex) {
     address seller = msg.sender;    
+    require(balanceOf[seller] > 0);
+
     Bid storage bid = sketchIndexToHighestBid[sketchIndex];
     uint256 price = bid.value;
     address bidder = bid.bidder;
@@ -376,6 +379,7 @@ contract SketchMarket is Ownable {
     require(offer.seller == sketchIndexToHolder[sketchIndex]); // the holder may have changed since an Offer was last put up
 
     address holder = offer.seller;
+    require(balanceOf[holder] > 0);
 
     sketchIndexToHolder[sketchIndex] = msg.sender; // transfer actual holdership!
     balanceOf[holder]--; // update balances
